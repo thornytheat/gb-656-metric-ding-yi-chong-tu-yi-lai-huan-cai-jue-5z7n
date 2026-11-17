@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}分支合并 · metricgraph{% endblock %}
+{% block body %}
+<section class="doc-section panel">
+  <h1>分支合并</h1>
+  <p class="lede">共同基线 <span class="mono">{{ defaults.base_file }}</span>　左 <span class="mono">{{ defaults.left_file }}</span>　右 <span class="mono">{{ defaults.right_file }}</span></p>
+  <div class="actions">
+    <button type="button" data-action="merge-open"
+            data-base-file="{{ defaults.base_file }}"
+            data-left-file="{{ defaults.left_file }}"
+            data-right-file="{{ defaults.right_file }}">按共同基线合并</button>
+    <a class="btn ghost" href="/api/merges">会话 JSON</a>
+    <span class="flash" data-flash></span>
+  </div>
+  <p class="lede">按身份对齐，两边各自的独立改动都保留；同一字段两份修改、一边删一边改、同名异身份，一律按整组身份选边，不按属性拼接。</p>
+</section>
+
+<section class="doc-section panel">
+  <h2><span class="clause">2</span>合并会话</h2>
+  {% if sessions %}
+  <div class="wrap-scroll">
+    <table>
+      <caption>会话清单<sup class="fn">1</sup></caption>
+      <thead>
+        <tr><th>会话</th><th>状态</th><th class="num">版本</th><th class="num">冲突</th><th>发布批次</th><th>更新</th></tr>
+      </thead>
+      <tbody>
+        {% for item in sessions %}
+        <tr data-merge-id="{{ item.merge_id }}" tabindex="0" role="button" aria-label="打开会话 {{ item.merge_id }}">
+          <td class="name">{{ item.merge_id }}</td>
+          <td>
+            {% if item.status == 'published' %}<span class="st st-ok">已发布</span>
+            {% else %}<span class="st st-warn">待裁决</span>{% endif %}
+          </td>
+          <td class="num">{{ item.selection_revision }}</td>
+          <td class="num">{{ item.conflict_count }}</td>
+          <td class="name">{{ item.published_run_id or '—' }}</td>
+          <td class="name">{{ item.updated_at|ts }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">还没有合并会话。</p>
+  {% endif %}
+</section>
+
+<section class="doc-section panel" data-merge-panel hidden>
+  <h2><span class="clause">3</span>冲突与选边</h2>
+  <p class="lede">会话 <span class="mono" data-merge-title>—</span>　版本 <span class="mono" data-merge-revision>0</span>　当前批次序号 <span class="mono">{{ current_seq }}</span></p>
+  <div class="actions">
+    <button type="button" data-action="merge-save">保存选边</button>
+    <button type="button" data-action="merge-publish">发布新批次</button>
+    <button type="button" class="ghost" data-action="merge-recover">失败后恢复</button>
+    <span class="flash" data-flash></span>
+  </div>
+  <div class="wrap-scroll">
+    <table>
+      <caption>冲突清单<sup class="fn">2</sup></caption>
+      <thead>
+        <tr><th>表</th><th>原因</th><th>左边</th><th>右边</th><th>选边</th></tr>
+      </thead>
+      <tbody data-merge-conflicts>
+        <tr><td colspan="5" class="empty">打开一个会话后显示。</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <h3>合成预览</h3>
+  <div class="wrap-scroll">
+    <table>
+      <thead><tr><th>表</th><th>字段</th><th>类型</th><th>必填</th><th>来源</th></tr></thead>
+      <tbody data-merge-preview>
+        <tr><td colspan="5" class="empty">—</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="lede" data-merge-status>未裁决或合成后重名一律拒绝发布。</p>
+</section>
+
+<aside class="notes">
+  <ol class="footnotes">
+    <li>同一份三件套（基线 + 左右）只建一个会话，重复合并不新增记录。<a class="back" href="#main">↩</a></li>
+    <li>分支内容一变，会话里的旧选择即失效；发布撞上过期基线直接 409。<a class="back" href="#main">↩</a></li>
+  </ol>
+</aside>
+{% endblock %}

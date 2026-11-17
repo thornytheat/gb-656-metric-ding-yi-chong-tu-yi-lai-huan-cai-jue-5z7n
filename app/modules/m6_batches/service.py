@@ -150,8 +150,7 @@ def execute(old_file: str = config.DEFAULT_OLD, new_file: str = config.DEFAULT_N
         "reused": False,
     }
     run["summary"] = history.summary_of(run)
-    store.save_run(run)
-    return run
+    return store.save_run(run)
 
 
 def ensure_seeded() -> dict | None:

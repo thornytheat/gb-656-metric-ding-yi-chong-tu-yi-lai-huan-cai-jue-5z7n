@@ -1,6 +1,6 @@
 # 深度登记 metricgraph
 
-- 规模：中型（7 个功能模块，76 个文件，65 条测试）
+- 规模：中型（8 个功能模块，82 个文件，109 条测试）
 - 核心规则：同名同版本指标先做表达式稳定签名，再按依赖图检测环并裁决生效版本。
 - 使用者与工作流：分析治理组在指标发布前复核定义冲突、缺依赖、依赖环与版本重叠。
 
@@ -15,6 +15,7 @@
 | M5 影响面 | 看受影响的下游节点、环、断链、单边登记 | GET /api/impact | `app/modules/m5_impact/handler.py` `app/modules/m5_impact/service.py` `app/modules/m5_impact/closure.py` `app/modules/m5_impact/cycle.py` `app/modules/m5_impact/broken.py` | `tests/test_m5_impact.py` |
 | M6 版本批次 | 跑批次、看历史、验陈旧拒绝与区间重叠 | POST /api/runs | `app/modules/m6_batches/handler.py` `app/modules/m6_batches/service.py` `app/modules/m6_batches/window.py` `app/modules/m6_batches/guard.py` `app/modules/m6_batches/history.py` | `tests/test_m6_batches.py` |
 | M7 指标目录 | 导出一份定义、依赖与状态清单 | GET /api/export/catalog.csv | `app/modules/m7_migration/handler.py` `app/modules/m7_migration/service.py` `app/modules/m7_migration/csv_out.py` `app/modules/m7_migration/ledger.py` | `tests/test_m7_migration.py` |
+| M8 分支合并 | 按共同基线合并两组改动，整组选边后发布新批次 | POST /api/merges | `app/modules/m8_merge/handler.py` `app/modules/m8_merge/service.py` `app/modules/m8_merge/merge.py` | `tests/test_m8_merge.py` |
 
 ## 陷阱登记
 
@@ -30,6 +31,12 @@
 | TRAP-22 | 同一字段被连续改过两次名 | 只认最近一跳，最早的名字解析不到 | 跨版本改名链一路解析到底 | `app/modules/m4_mapping/rename.py` | `tests/test_m4_mapping.py::test_trap22_alias_chain_resolves_multi_hop` |
 | TRAP-25 | 两个版本生效区间重叠 | 取到哪版看运气 | 半开区间比较，重叠直接标记警告 | `app/modules/m6_batches/window.py` | `tests/test_m6_batches.py::test_trap25_overlap_flagged_but_adjacent_clean` |
 | TRAP-26 | 基于旧版本号提交 | 后提交无条件覆盖新结果 | 版本号乐观锁，基线落后即 409 | `app/modules/m6_batches/guard.py` | `tests/test_m6_batches.py::test_trap26_stale_submission_rejected` |
+| TRAP-27 | 两组分支各改同一字段的不同属性 | 按属性拼出第三份没人确认过的规格 | 同身份两份修改一律整条选边，不拼接 | `app/modules/m8_merge/merge.py` | `tests/test_m8_merge.py::test_same_field_two_edits_must_choose_one_side_not_splice` |
+| TRAP-28 | 一方删字段、另一方改同一字段 | 静默保留或静默删除，丢掉一组成果 | 判 `MERGE_DELETE_VS_EDIT`，整条选边 | `app/modules/m8_merge/merge.py` | `tests/test_m8_merge.py::test_delete_vs_edit_is_conflict_not_silent_keep` |
+| TRAP-29 | 同表同列名在两边挂不同身份 | 按名字合并，造出无人确认的字段 | 并查集并组，按整组身份选边 | `app/modules/m8_merge/merge.py` | `tests/test_m8_merge.py::test_same_name_different_identity_needs_whole_field_choice` |
+| TRAP-30 | 合并后同表重名 | 生成一份自身矛盾的规格 | 发布闸门硬拒 `MERGE_DUPLICATE_NAME` | `app/modules/m8_merge/merge.py` | `tests/test_m8_merge.py::test_post_merge_duplicate_is_refused_by_gate` |
+| TRAP-31 | 分支内容变了还套旧选择发布 | 用过期基线发出新规格 | 摘要复核 + 版本号原子认领，过期即 409 | `app/modules/m8_merge/service.py` | `tests/test_m8_merge.py::test_branch_change_invalidates_saved_selections` |
+| TRAP-32 | 发布写库失败后重试 | 半截写入丢合并，或重试生成重复批次 | 保留 `pending` 标记，批次键幂等，复用已写批次 | `app/modules/m8_merge/service.py` | `tests/test_m8_merge.py::test_write_failure_then_recover_does_not_duplicate_batch` |
 
 ## 对账规则
 
@@ -37,6 +44,7 @@
 - 字段账：新版本 = 未变 + 改名 + 换类型 + 改必填 + 冲突 + 新增
 - 引用账：登记引用 = 可达 + 断链，其中可达 = 直接 + 经别名
 - 采信账：列定义行 = 接受字段 + 阻断行
+- 合并账：合成字段 = 基线未改 + 左独有 + 右独有 + 双方一致 + 选边取用；冲突组必须全部裁决
 - 页面上四账并列显示，差额不为 0 即判不平
 
 ## 已知不覆盖
@@ -45,4 +53,6 @@
 - DDL 只解析 `CREATE TABLE` 的列定义，不处理分区、约束、索引与 `ALTER`。
 - 类型格只覆盖数值、字符、时间、布尔四族；映射表、数组、结构体一律算 `unknown`，保守判破坏。
 - 生效区间重叠只标记不阻断，最终以版本序号为准。
+- 合并只处理字段的「名字、类型、必填、所在表」四项可见属性；字段级注释、排序、分区等不参与三方比较。
+- 合并只产出候选规格与批次，不做下游迁移；改名后的别名视图仍需另建。
 - 打印页脚用 `counter(page)`，Chrome 打印预览不渲染该计数。

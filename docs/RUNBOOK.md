@@ -23,7 +23,8 @@ docker compose exec -T app python -m pytest -q
 3. `/mapping` 看旧名到新名、别名 SQL、冲突项。
 4. `/impact` 看受影响节点、环、断链、单边登记。
 5. `/batches` 点「跑一次」，再点「陈旧提交」验证 409。
-6. `/spec` 导出迁移单与三份账目 CSV。
+6. `/merge` 点「按共同基线合并」，对未裁决项整组选边后发布新批次。
+7. `/spec` 导出迁移单与三份账目 CSV。
 
 ## 4 重建数据库
 
@@ -33,7 +34,6 @@ docker compose up -d --build
 ```
 
 命名卷 `metricgraph-data` 挂着 `/data/metricgraph.sqlite`。删卷即清空批次、快照与隔离区。
-
 ## 5 接口
 
 | 方法 | 路径 | 作用 |
@@ -49,6 +49,13 @@ docker compose up -d --build
 | GET | `/api/impact` | 影响面、环、断链 |
 | POST | `/api/runs` | 跑批次，可带基线版本号与生效区间 |
 | GET | `/api/batches` | 批次历史 |
+| POST | `/api/merges` | 按共同基线建合并会话（三份文件） |
+| GET | `/api/merges` | 合并会话清单 |
+| GET | `/api/merges/{merge_id}` | 会话详情与冲突组 |
+| GET | `/api/merges/{merge_id}/preview` | 套用已存裁决的合成预览 |
+| POST | `/api/merges/{merge_id}/selections` | 提交整组选边，可带 `expected_revision` |
+| POST | `/api/merges/{merge_id}/publish` | 发布新批次，过期基线即 409 |
+| POST | `/api/merges/{merge_id}/recover` | 写入失败后恢复，不重复生成批次 |
 | GET | `/api/reconcile` | 四账对账 |
 | GET | `/api/export/spec.md` | 迁移单 Markdown |
 | GET | `/api/export/fields.csv` | 字段账 CSV |
@@ -64,6 +71,9 @@ docker compose up -d --build
 | 400 `WINDOW_INVERTED` | 生效区间起点不早于终点 | 检查 `effective_from` / `effective_to` |
 | 400 `BAD_INPUT` | 文件名、参数或 JSON 结构不对 | 看返回的 `detail` |
 | 404 `NOT_FOUND` | 还没跑过批次 | 先在 `/batches` 点「跑一次」 |
+| 409 `MERGE_BLOCKED` | 合并还有未裁决项、非法裁决或合成后重名 | 逐组整条选边；重名先删一条再发布 |
+| 409 `MERGE_STALE` | 分支内容已变或会话被别的写入推进 | 重新建会话，或刷新后按当前版本重试 |
+| 409 `MERGE_WRITE_FAILED` | 发布写库失败，`pending` 标记保留 | 点「失败后恢复」或 POST `/recover`，同内容不会重复生成批次 |
 
 ## 7 端口与并发
 

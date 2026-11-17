@@ -38,6 +38,11 @@ EXTRA_METADATA = "metadata_extra.json"
 ALLOWED_SUFFIX = {".sql", ".json"}
 SAMPLE_NAME_RE = re.compile(r"^[A-Za-z0-9_.\-]+$")
 
+# 三分支合并的默认样例：共同基线 + 两组独立改动
+MERGE_BASE = "merge_base.sql"
+MERGE_LEFT = "merge_left.sql"
+MERGE_RIGHT = "merge_right.sql"
+
 # 类型别名：原始写法 -> 基础类型名
 TYPE_ALIASES = {
     "tinyint": "tinyint",

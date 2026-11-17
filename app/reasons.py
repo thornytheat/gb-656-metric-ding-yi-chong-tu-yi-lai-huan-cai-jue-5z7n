@@ -49,6 +49,18 @@ CODES: dict[str, tuple[str, str]] = {
     "VERSION_APPLIED": ("版本已登记", "info"),
     "RUN_REUSED": ("同一输入命中已算批次", "info"),
     "WINDOW_INVERTED": ("生效区间起点不早于终点", "break"),
+    # 三分支合并
+    "MERGE_CLEAN": ("三方改动互不重叠", "info"),
+    "MERGE_KEEP_BOTH": ("两边各改不同字段，合并保留双方", "info"),
+    "MERGE_BLOCKED": ("合并还有未裁决或重名项", "break"),
+    "MERGE_DELETE_VS_EDIT": ("一边删字段、另一边改同一字段", "break"),
+    "MERGE_NAME_TAKEOVER": ("同名挂在不同身份上", "break"),
+    "MERGE_DOUBLE_EDIT": ("同一字段两边各有一份修改", "break"),
+    "MERGE_DUPLICATE_NAME": ("合成后同表出现重名列", "break"),
+    "MERGE_UNRESOLVED": ("还有未裁决的冲突", "break"),
+    "MERGE_DECISION_INVALID": ("裁决值不在可选范围内", "break"),
+    "MERGE_STALE": ("分支内容已变，旧选择失效", "break"),
+    "MERGE_WRITE_FAILED": ("发布写入失败，可恢复重试", "break"),
     # 结论
     "COMPATIBLE": ("兼容", "info"),
     "COMPATIBLE_BY_MAPPING": ("加别名后兼容", "warn"),

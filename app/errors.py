@@ -48,6 +48,20 @@ class Conflict(FieldmapError):
     label = "记录冲突"
 
 
+class MergeBlocked(FieldmapError):
+    """合并还有未裁决项，或合成结果自相矛盾，不能发布。"""
+    status = 409
+    code = "MERGE_BLOCKED"
+    label = "合并未裁决"
+
+
+class MergeStale(FieldmapError):
+    """分支内容已变，旧的选择不能再套用。"""
+    status = 409
+    code = "MERGE_STALE"
+    label = "合并基础已过期"
+
+
 def install(app: FastAPI) -> None:
     @app.exception_handler(FieldmapError)
     async def _handle_domain(_: Request, exc: FieldmapError) -> JSONResponse:
